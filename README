@@ -1,0 +1,34 @@
+This is a stackscript for use on Linode to setup a Ruby on Rails environment. I pieced it together from a few resources mentioned below.
+
+It is intended for use on Ubuntu 10.04 (Lucid Lynx)
+
+It installs:
+
+- MySQL
+- Postfix
+- Ruby 1.9.3 p125
+- Nginx
+- Passenger
+- Rails
+
+It also sets up a couple handy things like:
+
+- Script to control Nginx ($> service nginx start|stop|restart)
+- A deployment user for use with Capistrano
+
+A few notes:
+
+Once the script completes you'll find Nginx installed in /usr/local. You'll likely need to edit Nginx's conf to be appropriate for your setup.
+
+Future possibilities, maybe?:
+
+- rbenv
+- apt-get install Nginx vs Passenger Nginx
+
+Resources: 
+
+- http://library.linode.com/web-servers/nginx/installation/ubuntu-10.04-lucid
+- http://www.linode.com/stackscripts/view/?StackScriptID=1291
+- http://library.linode.com/assets/660-init-deb.sh
+- http://articles.slicehost.com/2009/3/4/ubuntu-intrepid-adding-an-nginx-init-script
+- http://railscasts.com/episodes/335-deploying-to-a-vps
