@@ -9,149 +9,103 @@ NGINX_INSTALL_PATH="/usr/local/nginx"
 NGINX_DAEMON_PATH="/usr/local/nginx/sbin/nginx"
 RUBY_VERSION="ruby-1.9.3-p125"
 
-# http://www.linode.com/stackscripts/view/?StackScriptID=1
-source <ssinclude StackScriptID=1>  # Common bash functions
-
-function log {
-  echo "$1 `date '+%D %T'`" >> /root/log.txt
-}
-
-cd /tmp
-
 # Update packages and install essentials
-log "Updating system... "
-system_update
-log "System updated!"
+apt-get update
+apt-get -y upgrade
 
-log "Installing essentials... "
-apt-get -y install build-essential zlib1g-dev libssl-dev libreadline5-dev openssh-server libyaml-dev libcurl4-openssl-dev libxslt-dev libxml2-dev
-goodstuff
-log "Essentials installed!"
+apt-get -y install \
+build-essential \
+zlib1g-dev \
+libssl-dev \
+libreadline5-dev \
+libyaml-dev \
+libcurl4-openssl-dev \
+libxslt1-dev \
+libxml2-dev \
+git-core \
+python-software-properties
+
+add-apt-repository ppa:chris-lea/node.js
+apt-get update
+apt-get -y install nodejs
 
 # Set up MySQL
-log "Installing MySQL... "
-mysql_install "$DB_PASSWORD" && mysql_tune 40
-log "MySQL installed!"
+echo "mysql-server-5.1 mysql-server/root_password password $DB_PASSWORD" | debconf-set-selections
+echo "mysql-server-5.1 mysql-server/root_password_again password $DB_PASSWORD" | debconf-set-selections
+
+apt-get -y install \
+mysql-server \
+mysql-client
+
+sleep 5
+
+PERCENT=40
+MEM=$(awk '/MemTotal/ {print int($2/1024)}' /proc/meminfo) # how much memory in MB this system has
+MYMEM=$((MEM*PERCENT/100)) # how much memory we'd like to tune mysql with
+MYMEMCHUNKS=$((MYMEM/4)) # how many 4MB chunks we have to play with
+
+# mysql config options we want to set to the percentages in the second list, respectively
+OPTLIST=(key_buffer sort_buffer_size read_buffer_size read_rnd_buffer_size myisam_sort_buffer_size query_cache_size)
+DISTLIST=(75 1 1 1 5 15)
+
+for opt in ${OPTLIST[@]}; do
+    sed -i -e "/\[mysqld\]/,/\[.*\]/s/^$opt/#$opt/" /etc/mysql/my.cnf
+done
+
+for i in ${!OPTLIST[*]}; do
+    val=$(echo | awk "{print int((${DISTLIST[$i]} * $MYMEMCHUNKS/100))*4}")
+    if [ $val -lt 4 ]
+        then val=4
+    fi
+    config="${config}\n${OPTLIST[$i]} = ${val}M"
+done
+	
+sed -i -e "s/\(\[mysqld\]\)/\1\n$config\n/" /etc/mysql/my.cnf
 
 # Set up Postfix
-log "Installing Postfix... "
-postfix_install_loopback_only
-log "Postfix installed!"
+echo "postfix postfix/main_mailer_type select Internet Site" | debconf-set-selections
+echo "postfix postfix/mailname string localhost" | debconf-set-selections
+echo "postfix postfix/destinations string localhost.localdomain, localhost" | debconf-set-selections
 
-# Installing Ruby
-log "Installing $RUBY_VERSION... "
+apt-get -y install postfix
 
-log "Downloading ftp://ftp.ruby-lang.org/pub/ruby/1.9/$RUBY_VERSION.tar.gz):"
-log `wget ftp://ftp.ruby-lang.org/pub/ruby/1.9/$RUBY_VERSION.tar.gz`
+/usr/sbin/postconf -e "inet_interfaces = loopback-only"
 
-log `tar xzf $RUBY_VERSION.tar.gz`
+# Change to temp directory
+cd /tmp
+
+# Set up Ruby
+wget ftp://ftp.ruby-lang.org/pub/ruby/1.9/$RUBY_VERSION.tar.gz
+tar xzf $RUBY_VERSION.tar.gz
 rm "$RUBY_VERSION.tar.gz"
 cd $RUBY_VERSION
-
-log "Ruby configuration output:"
-log `./configure` 
-
-log ""
-log "Ruby make output:"
-log `make`
-
-log ""
-log "Ruby make install output:"
-log `make install` 
-
+./configure
+make
+make install
 cd ..
 rm -rf $RUBY_VERSION
 
-log "Ruby installed!"
+# Set up mysql-ruby
+apt-get -y install \
+libmysql-ruby \
+libmysqlclient-dev
 
-# Set up Nginx and Passenger
-log "Installing Nginx and Passenger... " 
-gem install passenger
+# Set up gems
+gem update --system
+gem install bundler --no-ri --no-rdoc
+gem install passenger --no-ri --no-rdoc
+
+# Set up nginx+passenger
 passenger-install-nginx-module --auto --auto-download --prefix="$NGINX_INSTALL_PATH"
-log "Passenger and Nginx installed!"
 
-# Configure nginx to start automatically
-cat >> /etc/init.d/nginx << EOF
-#! /bin/sh
-
-### BEGIN INIT INFO
-# Provides:          nginx
-# Required-Start:    $all
-# Required-Stop:     $all
-# Default-Start:     2 3 4 5
-# Default-Stop:      0 1 6
-# Short-Description: starts the nginx web server
-# Description:       starts nginx using start-stop-daemon
-### END INIT INFO
-
-PATH="/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin"
-DAEMON="$NGINX_DAEMON_PATH"
-N="/etc/init.d/nginx"
-
-test -x \$DAEMON || exit 0
-
-set -e
-
-case "\$1" in
-	start)
-		echo -n "Starting Nginx... "
-		start-stop-daemon --start --quiet --pidfile /usr/local/nginx/logs/nginx.pid --exec \$DAEMON -- \$DAEMON_OPTS
-		echo "Done!"
-		;;
-	stop)
-		echo -n "Stopping Nginx... "
-		start-stop-daemon --stop --quiet --pidfile /usr/local/nginx/logs/nginx.pid --exec \$DAEMON
-		echo "Done!"
-		;;
-	restart|force-reload)
-		echo -n "Restarting Nginx... "
-		start-stop-daemon --stop --quiet --pidfile /usr/local/nginx/logs/nginx.pid --exec \$DAEMON
-		sleep 1
-		start-stop-daemon --start --quiet --pidfile /usr/local/nginx/logs/nginx.pid --exec \$DAEMON -- \$DAEMON_OPTS
-		echo "Done!"
-		;;
-	reload)
-		echo -n "Reloading Nginx configuration... "
-		start-stop-daemon --stop --signal HUP --quiet --pidfile /usr/local/nginx/logs/nginx.pid --exec \$DAEMON
-		echo "Done!"
-		;;
-	*)
-	echo "Usage: \$N {start|stop|restart|reload|force-reload}" >&2
-	exit 1
-	;;
-esac
-
-exit 0
-
-EOF
-
+# Set up nginx init script
+wget https://raw.github.com/jordanthomas/nginx-init-ubuntu/master/nginx
+mv nginx /etc/init.d/
 chmod +x /etc/init.d/nginx
 /usr/sbin/update-rc.d -f nginx defaults
-log "Nginx configured to start automatically."
-
-# Install git
-apt-get -y install git-core
-
-# Update rubygems
-gem update --system
-
-# Install rails
-gem install rails --no-ri --no-rdoc
-
-# Install sqlite gem
-apt-get -y install sqlite3 libsqlite3-dev
-gem install sqlite3-ruby --no-ri --no-rdoc
-
-# Install mysql gem
-apt-get -y install libmysql-ruby libmysqlclient-dev
-gem install mysql2 --no-ri --no-rdoc
 
 # Add deploy user
 echo "deploy:$DEPLOY_PASSWORD:1000:1000::/home/deploy:/bin/bash" | newusers
 cp -a /etc/skel/.[a-z]* /home/deploy/
 chown -R deploy /home/deploy
 echo "deploy    ALL=(ALL) ALL" >> /etc/sudoers
-
-# Spit & polish
-restartServices
-log "StackScript Finished!"

@@ -1,6 +1,4 @@
-This is a stackscript for use on Linode to setup a Ruby on Rails environment. I pieced it together from a few resources mentioned below.
-
-It is intended for use on Ubuntu 10.04 (Lucid Lynx)
+This is a stackscript for use on Linode to setup a Ruby on Rails environment. I pieced it together from a few resources mentioned below. It is intended for use on Ubuntu 10.04 (Lucid Lynx), but may likely work on other deb systems.
 
 It installs:
 
@@ -10,6 +8,7 @@ It installs:
 - Nginx
 - Passenger
 - Rails
+- node.js
 
 It also sets up a couple handy things like:
 
@@ -32,3 +31,4 @@ Resources:
 - http://library.linode.com/assets/660-init-deb.sh
 - http://articles.slicehost.com/2009/3/4/ubuntu-intrepid-adding-an-nginx-init-script
 - http://railscasts.com/episodes/335-deploying-to-a-vps
+- https://github.com/JasonGiedymin/nginx-init-ubuntu
