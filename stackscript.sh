@@ -7,7 +7,7 @@
 
 NGINX_INSTALL_PATH="/usr/local/nginx"
 NGINX_DAEMON_PATH="/usr/local/nginx/sbin/nginx"
-RUBY_VERSION="ruby-1.9.3-p125"
+RUBY_VERSION="ruby-1.9.3-p194"
 
 # Update packages and install essentials
 apt-get update
