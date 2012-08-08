@@ -1,6 +1,6 @@
 #!/bin/bash
 # 
-# Installs Ruby 1.9.3-p125, and Nginx with Passenger. 
+# Installs Ruby 1.9.3-p194, and Nginx with Passenger. 
 #
 # <UDF name="db_password" Label="MySQL root password" />
 # <UDF name="deploy_password" Label="Deployment user password" />
